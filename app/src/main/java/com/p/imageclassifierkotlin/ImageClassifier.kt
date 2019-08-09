@@ -48,6 +48,9 @@ class ImageClassifier constructor(private val assetManager: AssetManager) {
         imgData.order(ByteOrder.nativeOrder())
         try {
             interpreter = Interpreter(loadModelFile(assetManager, MODEL_PATH))
+//            var byteArray = assetManager.open(MODEL_PATH).readBytes()
+//            var finalModel = ByteBuffer.wrap(byteArray)
+//            interpreter = Interpreter(finalModel)
         } catch (e: Exception) {
             throw RuntimeException(e)
         }
@@ -64,6 +67,7 @@ class ImageClassifier constructor(private val assetManager: AssetManager) {
                 imgData!!.put((value shr 16 and 0xFF).toByte())
                 imgData!!.put((value shr 8 and 0xFF).toByte())
                 imgData!!.put((value and 0xFF).toByte())
+
             }
         }
     }
