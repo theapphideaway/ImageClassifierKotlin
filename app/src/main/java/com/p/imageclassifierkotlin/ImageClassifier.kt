@@ -11,20 +11,18 @@ import com.p.imageclassifierkotlin.Keys.LABEL_PATH
 import com.p.imageclassifierkotlin.Keys.MAX_RESULTS
 import com.p.imageclassifierkotlin.Keys.MODEL_PATH
 import java.io.BufferedReader
-import java.io.FileInputStream
 import org.tensorflow.lite.Interpreter
 import io.reactivex.Single
 import java.io.IOException
 import java.io.InputStreamReader
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.nio.MappedByteBuffer
-import java.nio.channels.FileChannel
 import java.util.*
 import kotlin.Comparator
 import kotlin.collections.ArrayList
+import kotlin.math.min
 
-class ImageClassifier constructor(private val assetManager: AssetManager) {
+class ImageClassifier constructor(assetManager: AssetManager) {
 
     private var interpreter: Interpreter? = null
     private var labelProb: Array<ByteArray>
@@ -48,44 +46,39 @@ class ImageClassifier constructor(private val assetManager: AssetManager) {
         imgData.order(ByteOrder.nativeOrder())
         try {
             interpreter = Interpreter(loadModelFile(assetManager, MODEL_PATH))
-//            var byteArray = assetManager.open(MODEL_PATH).readBytes()
-//            var finalModel = ByteBuffer.wrap(byteArray)
-//            interpreter = Interpreter(finalModel)
         } catch (e: Exception) {
             throw RuntimeException(e)
         }
     }
 
     private fun convertBitmapToByteBuffer(bitmap: Bitmap) {
-        if (imgData == null) return
-        imgData!!.rewind()
+        imgData.rewind()
         bitmap.getPixels(intValues, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
         var pixel = 0
         for (i in 0 until DIM_IMG_SIZE_X) {
             for (j in 0 until DIM_IMG_SIZE_Y) {
-                val value = intValues!![pixel++]
-                imgData!!.put((value shr 16 and 0xFF).toByte())
-                imgData!!.put((value shr 8 and 0xFF).toByte())
-                imgData!!.put((value and 0xFF).toByte())
+                val value = intValues[pixel++]
+                imgData.put((value shr 16 and 0xFF).toByte())
+                imgData.put((value shr 8 and 0xFF).toByte())
+                imgData.put((value and 0xFF).toByte())
 
             }
         }
     }
 
-    private fun loadModelFile(assets: AssetManager, modelFilename: String): MappedByteBuffer {
-        val fileDescriptor = assets.openFd(modelFilename)
-        val inputStream = FileInputStream(fileDescriptor.fileDescriptor)
-        val fileChannel = inputStream.channel
-        val startOffset = fileDescriptor.startOffset
-        val declaredLength = fileDescriptor.declaredLength
-        return fileChannel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength)
+    private fun loadModelFile(assets: AssetManager, modelFilename: String): ByteBuffer {
+        val inputStream = assets.open(modelFilename)
+        val byteArray = inputStream.run { readBytes() }
+        val byteBuffer = ByteBuffer.allocateDirect(byteArray.size)
+        byteBuffer.order(ByteOrder.nativeOrder())
+        return byteBuffer.put(byteArray)
     }
 
     fun recognizeImage(bitmap: Bitmap): Single<List<Result>> {
         return Single.just(bitmap).flatMap {
             convertBitmapToByteBuffer(it)
             interpreter!!.run(imgData, labelProb)
-            val pq = PriorityQueue<Result>(3,
+            val pq = PriorityQueue(3,
                 Comparator<Result> { lhs, rhs ->
                     // Intentionally reversed to put high confidence at the head of the queue.
                     (rhs.confidence!!).compareTo(lhs.confidence!!)
@@ -94,8 +87,8 @@ class ImageClassifier constructor(private val assetManager: AssetManager) {
                 pq.add(Result("" + i, if (labels.size > i) labels[i] else "unknown", labelProb[0][i].toFloat(), null))
             }
             val recognitions = ArrayList<Result>()
-            val recognitionsSize = Math.min(pq.size, MAX_RESULTS)
-            for (i in 0 until recognitionsSize) recognitions.add(pq.poll())
+            val recognitionsSize = min(pq.size, MAX_RESULTS)
+            for (i in 0 until recognitionsSize) recognitions.add(pq.poll()!!)
             return@flatMap Single.just(recognitions)
         }
     }

@@ -14,7 +14,7 @@ class Result(val id: String?, val title: String?, val confidence: Float?, privat
 }
 
 object Keys {
-    const val MODEL_PATH = ""
+    const val MODEL_PATH = "mobilenet_quant_v1_224.tflite"
     const val LABEL_PATH = "labels.txt"
     const val INPUT_SIZE = 224
     const val MAX_RESULTS = 1
