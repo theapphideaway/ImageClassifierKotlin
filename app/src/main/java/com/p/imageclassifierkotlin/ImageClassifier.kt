@@ -6,6 +6,8 @@ import com.p.imageclassifierkotlin.Keys.DIM_BATCH_SIZE
 import com.p.imageclassifierkotlin.Keys.DIM_IMG_SIZE_X
 import com.p.imageclassifierkotlin.Keys.DIM_IMG_SIZE_Y
 import com.p.imageclassifierkotlin.Keys.DIM_PIXEL_SIZE
+import com.p.imageclassifierkotlin.Keys.IMAGE_MEAN
+import com.p.imageclassifierkotlin.Keys.IMAGE_STD
 import com.p.imageclassifierkotlin.Keys.INPUT_SIZE
 import com.p.imageclassifierkotlin.Keys.LABEL_PATH
 import com.p.imageclassifierkotlin.Keys.MAX_RESULTS
@@ -25,7 +27,7 @@ import kotlin.math.min
 class ImageClassifier constructor(assetManager: AssetManager) {
 
     private var interpreter: Interpreter? = null
-    private var labelProb: Array<ByteArray>
+    private var labelProb: Array<FloatArray>
     private val labels = Vector<String>()
     private val intValues by lazy { IntArray(INPUT_SIZE * INPUT_SIZE) }
     private var imgData: ByteBuffer
@@ -41,8 +43,8 @@ class ImageClassifier constructor(assetManager: AssetManager) {
         } catch (e: IOException) {
             throw RuntimeException("Problem reading label file!", e)
         }
-        labelProb = Array(1) { ByteArray(labels.size) }
-        imgData = ByteBuffer.allocateDirect(DIM_BATCH_SIZE * DIM_IMG_SIZE_X * DIM_IMG_SIZE_Y * DIM_PIXEL_SIZE)
+        labelProb = Array(1) { FloatArray(labels.size) }
+        imgData = ByteBuffer.allocateDirect(4* DIM_BATCH_SIZE * DIM_IMG_SIZE_X * DIM_IMG_SIZE_Y * DIM_PIXEL_SIZE)
         imgData.order(ByteOrder.nativeOrder())
         try {
             interpreter = Interpreter(loadModelFile(assetManager, MODEL_PATH))
@@ -58,10 +60,9 @@ class ImageClassifier constructor(assetManager: AssetManager) {
         for (i in 0 until DIM_IMG_SIZE_X) {
             for (j in 0 until DIM_IMG_SIZE_Y) {
                 val value = intValues[pixel++]
-                imgData.put((value shr 16 and 0xFF).toByte())
-                imgData.put((value shr 8 and 0xFF).toByte())
-                imgData.put((value and 0xFF).toByte())
-
+                imgData.putFloat(((value shr 16 and 0xFF) - IMAGE_MEAN) / IMAGE_STD)
+                imgData.putFloat(((value shr 8 and 0xFF) - IMAGE_MEAN) / IMAGE_STD)
+                imgData.putFloat(((value and 0xFF) - IMAGE_MEAN) / IMAGE_STD)
             }
         }
     }
